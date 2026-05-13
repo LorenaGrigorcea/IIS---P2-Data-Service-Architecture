@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Public Transport Analytics Dashboard</title>
+
+    <link rel="stylesheet" href="dashboard.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="dashboard.js" defer></script>
+</head>
+
+<body>
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">PT</div>
+            <div>
+                <div class="brand-title">Transport BI</div>
+                <div class="brand-subtitle">SparkSQL Web Analytics</div>
+            </div>
+        </div>
+
+        <nav class="side-nav">
+            <button class="nav-item active" data-section="overview" onclick="showSection('overview')">
+                Overview
+            </button>
+            <button class="nav-item" data-section="sales" onclick="showSection('sales')">
+                Sales Analytics
+            </button>
+            <button class="nav-item" data-section="network" onclick="showSection('network')">
+                Network Analytics
+            </button>
+            <button class="nav-item" data-section="operations" onclick="showSection('operations')">
+                Operational Events
+            </button>
+            <button class="nav-item" data-section="telemetry" onclick="showSection('telemetry')">
+                Telemetry Analytics
+            </button>
+        </nav>
+
+        <div class="sidebar-note">
+            <div class="note-title">REST Web Model</div>
+            <div class="note-text">
+                Dashboard consuming analytical REST endpoints exposed by DSA-WEB-RESTService.
+            </div>
+        </div>
+    </aside>
+
+    <main class="content">
+        <div class="topbar">
+            <div>
+                <h1>Public Transport Analytics Dashboard</h1>
+                <p>
+                    Interactive Web Analytics interface based on SparkSQL analytical views exposed through REST endpoints.
+                </p>
+            </div>
+
+            <div class="topbar-actions">
+                <button class="refresh-button" onclick="loadDashboard()">Refresh dashboard</button>
+                <div id="status" class="status">Waiting for data...</div>
+            </div>
+        </div>
+
+        <div id="errorBox" class="error"></div>
+
+        <section id="overview" class="section active">
+            <div class="section-heading">
+                <h2>Overview</h2>
+                <p>General indicators computed from the analytical REST endpoints.</p>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi">
+                    <div class="label">Total revenue</div>
+                    <div id="kpiRevenue" class="value">-</div>
+                    <div class="hint">computed from daily sales</div>
+                </div>
+
+                <div class="kpi">
+                    <div class="label">Total validations</div>
+                    <div id="kpiValidations" class="value">-</div>
+                    <div class="hint">computed from network validation view</div>
+                </div>
+
+                <div class="kpi">
+                    <div class="label">Operational events</div>
+                    <div id="kpiEvents" class="value">-</div>
+                    <div class="hint">from operational events type view</div>
+                </div>
+
+                <div class="kpi">
+                    <div class="label">Average telemetry speed</div>
+                    <div id="kpiSpeed" class="value">-</div>
+                    <div class="hint">computed from telemetry logs</div>
+                </div>
+            </div>
+
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <h3>Implemented REST endpoints</h3>
+                    <p>The Web Model currently exposes six analytical views as JSON resources.</p>
+                    <ul>
+                        <li>/OLAP/daily-sales-window</li>
+                        <li>/OLAP/line-validation-ranking</li>
+                        <li>/OLAP/operational-events-type</li>
+                        <li>/OLAP/sales-ticket-area-cube</li>
+                        <li>/OLAP/validations-network</li>
+                        <li>/OLAP/telemetry-window</li>
+                    </ul>
+                </div>
+
+                <div class="overview-card">
+                    <h3>Architecture flow</h3>
+                    <p>
+                        SparkSQL analytical views are mapped as JPA read-only entities, queried through repositories
+                        and exposed through REST endpoints consumed by this dashboard.
+                    </p>
+                    <div class="flow">
+                        SparkSQL View → JPA Entity → Repository → REST endpoint → Dashboard
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sales" class="section">
+            <div class="section-heading">
+                <h2>Sales Analytics</h2>
+                <p>Ticket sales, revenue evolution, moving averages and multidimensional sales analysis.</p>
+            </div>
+
+            <div class="grid">
+                <div class="card card-wide">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Daily sales and moving average</h2>
+                            <p class="card-subtitle">Revenue evolution with 7-day moving average and cumulative revenue.</p>
+                        </div>
+                    </div>
+                    <div id="dailySalesChart" class="chart chart-large"></div>
+                </div>
+
+                <div class="card card-wide">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Sales by ticket and area</h2>
+                            <p class="card-subtitle">Top combinations by paid amount.</p>
+                        </div>
+                    </div>
+                    <div id="salesCubeChart" class="chart chart-large"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="network" class="section">
+            <div class="section-heading">
+                <h2>Network Analytics</h2>
+                <p>Validation ranking and validation aggregates across lines, routes and stops.</p>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Line validation ranking</h2>
+                            <p class="card-subtitle">Transport lines ranked by validations.</p>
+                        </div>
+                        <select id="rankingDateSelect" onchange="renderLineRankingChart()"></select>
+                    </div>
+                    <div id="lineRankingChart" class="chart"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Network validation details</h2>
+                            <p class="card-subtitle">Line, route and stop validation aggregates.</p>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Line</th>
+                                <th>Route</th>
+                                <th>Stop</th>
+                                <th>Validations</th>
+                            </tr>
+                            </thead>
+                            <tbody id="networkTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="operations" class="section">
+            <div class="section-heading">
+                <h2>Operational Events</h2>
+                <p>Incident, maintenance, special event and telemetry distribution.</p>
+            </div>
+
+            <div class="grid">
+                <div class="card card-wide">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Operational events by source</h2>
+                            <p class="card-subtitle">Distribution of operational records by source type.</p>
+                        </div>
+                    </div>
+                    <div id="eventsChart" class="chart chart-large"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="telemetry" class="section">
+            <div class="section-heading">
+                <h2>Telemetry Analytics</h2>
+                <p>Vehicle telemetry with speed, occupancy and moving average indicators.</p>
+            </div>
+
+            <div class="grid">
+                <div class="card card-wide">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Telemetry speed window</h2>
+                            <p class="card-subtitle">Vehicle speed and moving average over telemetry timestamps.</p>
+                        </div>
+                    </div>
+                    <div id="telemetryChart" class="chart chart-large"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>
